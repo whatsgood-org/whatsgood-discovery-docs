@@ -13,13 +13,17 @@ This is a read-only surface — there's nothing to create, approve, or manage.
 ## Authentication
 
 You'll be issued a **read-only API key** by Whats Good. Send it in the
-**`X-API-Key`** header (or, if headers aren't possible, the `?api_key=` query
-param) on every request:
+**`X-API-Key`** request header on every request:
 
 ```bash
 curl "https://whatsgoodapi.up.railway.app/discover/cities" \
   -H "X-API-Key: YOUR_KEY"
 ```
+
+> ⚠️ **Header only.** Discovery keys cannot be passed via a `?api_key=` query
+> parameter — keys in URLs leak through server access logs, `Referer` headers,
+> and browser history. Sending a discovery key in the query string returns
+> **401**. Always use the header.
 
 > Want a key? Contact Whats Good at **dustin@checkwhatsgood.com**.
 
@@ -27,10 +31,11 @@ curl "https://whatsgoodapi.up.railway.app/discover/cities" \
 
 | Status | Meaning |
 |--------|---------|
-| `401` | Missing or invalid API key |
+| `401` | Missing or invalid API key (or a discovery key sent via `?api_key=`) |
 | `403` | This key isn't a discovery (read-only) key |
 | `404` | No such event |
-| `422` | Query params failed validation |
+| `422` | Query params failed validation (e.g. missing required `city`) |
+| `429` | Rate limit exceeded — back off and retry after `Retry-After` seconds |
 
 ---
 
@@ -147,11 +152,23 @@ curl -s "$BASE/discover/events/50274" -H "X-API-Key: $KEY"
 
 ---
 
-## Fair use
+## Rate limit
 
-There are no hard rate limits today, but please keep request volume reasonable —
-page through results rather than hammering, and cache where you can. Usage is
-tracked per key. Abuse may lead to a key being revoked.
+Each discovery key is limited to **120 requests per 60 seconds** across all
+`/discover/*` endpoints. Over-budget requests get HTTP **429** with a
+`Retry-After` header (seconds until your window resets):
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 37
+```
+
+The window is fixed, not sliding — once it resets, you have your full budget
+again. Cache `/discover/cities` (it changes slowly) and paginate `/discover/events`
+rather than hammering. Sustained abuse may lead to a key being revoked.
+
+Usage is tracked per key (request count, timing, route). Bodies, query params,
+and user-agents are **not** logged.
 
 ---
 
