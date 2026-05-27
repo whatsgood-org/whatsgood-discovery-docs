@@ -34,11 +34,17 @@ curl "https://whatsgoodapi.up.railway.app/discover/cities" \
 
 ---
 
-## What you get
+## How to use it (two-step flow)
 
-Every endpoint returns only **browsable** events: those that are **upcoming**
-(start in the future), not duplicates, and not removed. Events span all cities,
-soonest first.
+1. **Call `GET /discover/cities` once** to learn which cities are supported.
+2. **Then call `GET /discover/events?city=…`** with one of those values.
+
+`city` is **required** on `/discover/events` — you'll get `422` if you omit it.
+This keeps queries scoped to a destination and avoids accidentally pulling
+events from every city in a single call.
+
+Every event the API returns is **browsable**: upcoming (starts in the future),
+not a duplicate, and not removed. Results come back soonest first.
 
 ---
 
@@ -63,35 +69,39 @@ curl -s "$BASE/discover/events?city=Boise&category=Music&start_date_to=2026-07-0
 
 ## `GET /discover/cities`
 
-List cities that currently have upcoming events, with a count for each. Use it
-to discover coverage before querying a destination.
+The list of cities supported by the Discovery API. Call this first to learn
+which `city` values are valid for `GET /discover/events`.
 
 ```json
 {
   "items": [
-    { "city": "Boise", "state": "Idaho", "upcoming_event_count": 641 },
-    { "city": "St. Petersburg", "state": "Florida", "upcoming_event_count": 520 }
+    { "city": "Boise", "state": "Idaho" },
+    { "city": "St. Petersburg", "state": "Florida" }
   ],
   "total": 2
 }
 ```
 
+A city only appears here if it currently has at least one browsable upcoming
+event — you can safely query any city in the list and expect results. The
+endpoint advertises **coverage**, not inventory size, so it deliberately does
+not return event counts.
+
 ---
 
 ## `GET /discover/events`
 
-List upcoming events across all cities (paginated, soonest first). All params
-are optional:
+List upcoming events for a single city (paginated, soonest first).
 
-| Param | Purpose |
-|-------|---------|
-| `city` | City name, e.g. `St. Petersburg` (case-insensitive, exact) |
-| `state` | State/region name (case-insensitive, exact) |
-| `category` | Category name, e.g. `Music` (case-insensitive, exact) |
-| `is_free` | `true` = only free events, `false` = only paid |
-| `start_date_to` | Upper bound on start date (ISO 8601). The lower bound is always "now" |
-| `search` | Free-text match on title/description |
-| `page`, `page_size` | Pagination (`page_size` max **100**, default 20) |
+| Param | Required | Purpose |
+|-------|----------|---------|
+| `city` | ✅ | City name, e.g. `St. Petersburg` (case-insensitive, exact). Must be one returned by `GET /discover/cities` |
+| `state` | | State/region name (case-insensitive, exact). Useful when two cities share a name |
+| `category` | | Category name, e.g. `Music` (case-insensitive, exact) |
+| `is_free` | | `true` = only free events, `false` = only paid |
+| `start_date_to` | | Upper bound on start date (ISO 8601). The lower bound is always "now" |
+| `search` | | Free-text match on title/description |
+| `page`, `page_size` | | Pagination (`page_size` max **100**, default 20) |
 
 ```json
 {
